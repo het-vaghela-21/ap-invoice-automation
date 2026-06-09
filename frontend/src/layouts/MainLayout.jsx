@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   FileText, LayoutDashboard, FileSpreadsheet, 
-  Settings, Menu, X, Bell, LogOut, ChevronDown, Cpu, RefreshCw
+  Settings, Menu, X, Bell, LogOut, ChevronDown, Cpu, RefreshCw, AlertTriangle
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -19,7 +19,8 @@ const MainLayout = ({ children }) => {
       { name: 'Vendors', href: '/vendors', icon: FileText },
       { name: 'Purchase Orders', href: '/purchase-orders', icon: FileSpreadsheet },
       { name: 'Invoices', href: '/invoices', icon: FileSpreadsheet },
-      { name: 'Invoice Validation', href: '/validation', icon: RefreshCw }
+      { name: 'Invoice Validation', href: '/validation', icon: RefreshCw },
+      { name: 'Exceptions', href: '/exceptions', icon: AlertTriangle }
     ] : []),
     { name: 'System Settings', href: '#settings', icon: Settings },
   ];

@@ -42,4 +42,11 @@ router.post('/login', loginValidationRules, authController.login);
  */
 router.get('/me', authenticateUser, authController.getCurrentUser);
 
+/**
+ * @route   GET /api/auth/users
+ * @desc    Retrieve list of potential assignees (Admin, Manager, AccountsExecutive)
+ * @access  Private (Protected Route)
+ */
+router.get('/users', authenticateUser, authController.getUsers);
+
 export default router;

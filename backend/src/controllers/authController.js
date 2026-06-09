@@ -168,3 +168,24 @@ export const getCurrentUser = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * @desc    Get all active users with role Admin, Manager, or AccountsExecutive
+ * @route   GET /api/auth/users
+ * @access  Private
+ */
+export const getUsers = async (req, res, next) => {
+  try {
+    const users = await User.find({
+      isActive: true,
+      role: { $in: ['Admin', 'Manager', 'AccountsExecutive'] }
+    }).select('firstName lastName email role');
+
+    res.status(200).json({
+      status: 'success',
+      data: users
+    });
+  } catch (error) {
+    next(error);
+  }
+};

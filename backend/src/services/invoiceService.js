@@ -3,6 +3,9 @@ import Vendor from '../models/Vendor.js';
 import validationService from './validationService.js';
 import { uploadFile, deleteFile } from '../config/cloudinary.js';
 import workflowService from './workflowService.js';
+import { runValidationEngine } from '../controllers/validationController.js';
+import exceptionService from './exceptionService.js';
+import { getFuzzySimilarityScore } from '../utils/fuzzyMatching.js';
 
 /**
  * Reusable Service Layer for Invoice Management (Refactored for True Automation & OCR)
@@ -175,19 +178,66 @@ const invoiceService = {
         ...confidenceScores,
         gstNumber: confidenceScores?.gstNumber || null
       };
-      invoice.matchedVendor = null;
+
+      // Try to find the best vendor match automatically
+      const vendors = await Vendor.find();
+      const inputVendorName = extractedData?.vendorName || '';
+      let bestVendor = null;
+      let bestSimilarity = 0;
+
+      if (inputVendorName) {
+        for (const vendor of vendors) {
+          const score = getFuzzySimilarityScore(inputVendorName, vendor.vendorName);
+          if (score > bestSimilarity) {
+            bestSimilarity = score;
+            bestVendor = vendor;
+          }
+        }
+      }
+
+      if (bestVendor && bestSimilarity >= 80) {
+        invoice.matchedVendor = bestVendor._id;
+        invoice.vendorSimilarityScore = bestSimilarity;
+      } else {
+        invoice.matchedVendor = null;
+        invoice.vendorSimilarityScore = bestSimilarity;
+      }
+
       invoice.matchedPO = null;
       invoice.matchingStatus = 'NotMatched';
+
+      const candidateData = {
+        invoiceNumber: extractedData?.invoiceNumber || '',
+        poNumber: extractedData?.poNumber || '',
+        vendorName: extractedData?.vendorName || '',
+        invoiceDate: extractedData?.invoiceDate || '',
+        totalAmount: extractedData?.totalAmount !== undefined && extractedData?.totalAmount !== '' ? parseFloat(extractedData.totalAmount) : null,
+        taxAmount: extractedData?.taxAmount !== undefined && extractedData?.taxAmount !== '' ? parseFloat(extractedData.taxAmount) : null,
+        gstNumber: extractedData?.gstNumber || ''
+      };
+
+      // Run validation engine
+      const result = await runValidationEngine(invoice, candidateData, invoice.matchedVendor);
+
       invoice.extractionStatus = extractionStatus || 'Completed';
 
-      // Save raw extraction changes before transition
+      // Save raw extraction changes before processing exceptions and workflow status
       await invoice.save();
 
-      const isCompleted = (extractionStatus || 'Completed') === 'Completed';
-      const nextStatus = isCompleted ? 'Extracted' : 'Exception';
-      const notes = isCompleted ? 'OCR text extraction completed.' : 'OCR text extraction failed.';
+      // Process exceptions (creates new ones or auto-resolves existing ones)
+      await exceptionService.processValidationExceptions(invoice, result, null);
 
-      await workflowService.changeInvoiceStatus(invoice._id, nextStatus, null, notes);
+      const isCompleted = (extractionStatus || 'Completed') === 'Completed';
+      if (!isCompleted) {
+        await workflowService.changeInvoiceStatus(invoice._id, 'Exception', null, 'OCR text extraction pipeline failed.');
+      } else {
+        const targetStatus = result.isValid ? 'Extracted' : 'Exception';
+        const notes = result.isValid
+          ? 'OCR text extraction completed and all validation checks passed.'
+          : `OCR text extraction completed with validation exceptions: ${result.missingFields?.length > 0 ? 'Missing fields. ' : ''}${!result.poMatched ? 'PO mismatch/not found. ' : ''}${!result.isVendorMatchPass ? 'Vendor mismatch. ' : ''}${!result.dateValid ? 'Invalid date. ' : ''}${result.isDuplicate ? 'Duplicate invoice. ' : ''}${!result.ocrConfidenceValid ? 'Low confidence. ' : ''}`;
+
+        await workflowService.changeInvoiceStatus(invoice._id, targetStatus, null, notes);
+      }
       console.log(`[ML Pipeline] Successful extraction update for invoice: ${id}`);
     } catch (err) {
       console.error(`[ML Pipeline] Failed for invoice ${id}:`, err.message);

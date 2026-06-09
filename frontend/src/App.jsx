@@ -16,6 +16,8 @@ import InvoiceDetailsPage from './pages/InvoiceDetailsPage.jsx';
 import ValidationWorkspacePage from './pages/ValidationWorkspacePage.jsx';
 import ValidationQueuePage from './pages/ValidationQueuePage.jsx';
 import VendorsPage from './pages/VendorsPage.jsx';
+import ExceptionsPage from './pages/ExceptionsPage.jsx';
+import ExceptionDetailsPage from './pages/ExceptionDetailsPage.jsx';
 
 /**
  * Main App Component configuring client-side routing and providers.
@@ -155,6 +157,32 @@ function App() {
                 <RoleProtectedRoute allowedRoles={['Admin', 'Manager', 'AccountsExecutive']}>
                   <MainLayout>
                     <ValidationQueuePage />
+                  </MainLayout>
+                </RoleProtectedRoute>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/exceptions"
+            element={
+              <ProtectedRoute>
+                <RoleProtectedRoute allowedRoles={['Admin', 'Manager', 'AccountsExecutive']}>
+                  <MainLayout>
+                    <ExceptionsPage />
+                  </MainLayout>
+                </RoleProtectedRoute>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/exceptions/:id"
+            element={
+              <ProtectedRoute>
+                <RoleProtectedRoute allowedRoles={['Admin', 'Manager', 'AccountsExecutive']}>
+                  <MainLayout>
+                    <ExceptionDetailsPage />
                   </MainLayout>
                 </RoleProtectedRoute>
               </ProtectedRoute>

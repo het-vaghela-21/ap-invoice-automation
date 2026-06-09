@@ -4,12 +4,13 @@ import PurchaseOrder from '../models/PurchaseOrder.js';
 import validationService from '../services/validationService.js';
 import { getFuzzySimilarityScore } from '../utils/fuzzyMatching.js';
 import workflowService from '../services/workflowService.js';
+import exceptionService from '../services/exceptionService.js';
 
 /**
  * Helper to execute full validation & matching checks on an invoice.
  * Updates the invoice document state in-place (does not call save()).
  */
-const runValidationEngine = async (invoice, candidateData, vendorId) => {
+export const runValidationEngine = async (invoice, candidateData, vendorId) => {
   if (!vendorId) {
     invoice.validationStatus = 'MissingRequiredFields';
     invoice.matchingStatus = 'NotMatched';
@@ -74,10 +75,46 @@ const runValidationEngine = async (invoice, candidateData, vendorId) => {
     poValid = false;
   }
 
+  // 4. Date validation
+  let dateValid = true;
+  if (candidateData.invoiceDate) {
+    const parsedDate = new Date(candidateData.invoiceDate);
+    if (isNaN(parsedDate.getTime()) || parsedDate > new Date()) {
+      dateValid = false;
+    }
+  } else {
+    dateValid = false;
+  }
+
+  // 5. Duplicate check
+  let isDuplicate = false;
+  if (candidateData.invoiceNumber && vendorId) {
+    const duplicateInvoice = await Invoice.findOne({
+      _id: { $ne: invoice._id },
+      'extractedData.invoiceNumber': { $regex: new RegExp("^" + candidateData.invoiceNumber.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + "$", "i") },
+      matchedVendor: vendorId,
+      currentStatus: { $ne: 'Exception' }
+    });
+    if (duplicateInvoice) {
+      isDuplicate = true;
+    }
+  }
+
+  // 6. OCR Confidence check
+  let ocrConfidenceValid = true;
+  if (invoice.confidenceScores) {
+    const confidenceObj = invoice.confidenceScores.toObject ? invoice.confidenceScores.toObject() : invoice.confidenceScores;
+    Object.entries(confidenceObj || {}).forEach(([field, score]) => {
+      if (field !== '_id' && score !== null && score !== undefined && score < 70) {
+        ocrConfidenceValid = false;
+      }
+    });
+  }
+
   // Determine Overall Validation Status
   if (!fieldsValid) {
     invoice.validationStatus = 'MissingRequiredFields';
-  } else if (poValid) {
+  } else if (poValid && dateValid && !isDuplicate && ocrConfidenceValid) {
     invoice.validationStatus = 'POMatched';
   } else {
     invoice.validationStatus = 'ReadyForReview'; // Fields valid but PO mismatch/missing
@@ -85,14 +122,17 @@ const runValidationEngine = async (invoice, candidateData, vendorId) => {
 
   // Overall Decision (Finalizable only when all pass)
   const isVendorMatchPass = similarity >= 80;
-  const allChecksPass = fieldsValid && poValid && isVendorMatchPass;
+  const allChecksPass = fieldsValid && poValid && isVendorMatchPass && dateValid && !isDuplicate && ocrConfidenceValid;
   
   return {
     isValid: allChecksPass,
     missingFields: valResult.missingFields,
     vendorSimilarityScore: similarity,
     poMatched: poValid,
-    isVendorMatchPass
+    isVendorMatchPass,
+    dateValid,
+    isDuplicate,
+    ocrConfidenceValid
   };
 };
 
@@ -247,6 +287,9 @@ export const reRunValidation = async (req, res, next) => {
     // Save matching fields in DB before transition
     await invoice.save();
 
+    // Process exceptions (create or resolve them)
+    await exceptionService.processValidationExceptions(invoice, result, req.user._id);
+
     // Log validation and matching events
     await workflowService.logAction(invoice._id, 'Vendor Match Completed', req.user._id, `Vendor similarity score: ${result.vendorSimilarityScore}%. Vendor: ${invoice.extractedData.vendorName || 'N/A'}`);
     await workflowService.logAction(invoice._id, 'PO Match Completed', req.user._id, `PO matching status: ${invoice.matchingStatus}. PO matched: ${result.poMatched ? 'YES' : 'NO'}`);
@@ -255,7 +298,7 @@ export const reRunValidation = async (req, res, next) => {
     const targetStatus = result.isValid ? 'Validated' : 'Exception';
     const transitionNotes = result.isValid 
       ? 'Invoice validation checks passed successfully.' 
-      : `Invoice validation failed. Mismatches/warnings detected: ${result.missingFields.length > 0 ? `Missing: ${result.missingFields.join(', ')}` : ''} ${!result.poMatched ? 'PO Mismatch' : ''} ${!result.isVendorMatchPass ? 'Low vendor similarity score' : ''}`;
+      : `Invoice validation failed. Mismatches/warnings detected: ${result.missingFields.length > 0 ? `Missing: ${result.missingFields.join(', ')}` : ''} ${!result.poMatched ? 'PO Mismatch' : ''} ${!result.isVendorMatchPass ? 'Low vendor similarity score' : ''} ${!result.dateValid ? 'Invalid/Future date' : ''} ${result.isDuplicate ? 'Duplicate invoice detected' : ''} ${!result.ocrConfidenceValid ? 'Low OCR confidence score' : ''}`;
 
     await workflowService.changeInvoiceStatus(invoice._id, targetStatus, req.user._id, transitionNotes);
 

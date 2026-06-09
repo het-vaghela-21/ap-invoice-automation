@@ -65,6 +65,18 @@ const authService = {
     } catch (error) {
       throw error.response?.data || new Error('Failed to retrieve current user profile');
     }
+  },
+
+  /**
+   * Retrieves all users (potential assignees)
+   */
+  getUsers: async () => {
+    try {
+      const response = await apiClient.get('/auth/users');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || new Error('Failed to retrieve assignees');
+    }
   }
 };
 

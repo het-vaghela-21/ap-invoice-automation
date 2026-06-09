@@ -1,0 +1,134 @@
+import mongoose from 'mongoose';
+
+const invoiceSchema = new mongoose.Schema(
+  {
+    invoiceFileUrl: {
+      type: String,
+      required: [true, 'Invoice file URL is required']
+    },
+    invoicePublicId: {
+      type: String,
+      required: [true, 'Invoice file storage public ID is required']
+    },
+    originalFileName: {
+      type: String,
+      required: [true, 'Original file name is required'],
+      trim: true
+    },
+    extractionStatus: {
+      type: String,
+      enum: ['Pending', 'Processing', 'Completed', 'Failed'],
+      required: [true, 'Extraction status is required'],
+      default: 'Pending'
+    },
+    matchingStatus: {
+      type: String,
+      enum: ['NotMatched', 'Matched', 'Mismatch'],
+      required: [true, 'Matching status is required'],
+      default: 'NotMatched'
+    },
+    extractedData: {
+      invoiceNumber: {
+        type: String,
+        default: null
+      },
+      poNumber: {
+        type: String,
+        default: null
+      },
+      vendorName: {
+        type: String,
+        default: null
+      },
+      invoiceDate: {
+        type: String,
+        default: null
+      },
+      totalAmount: {
+        type: Number,
+        default: null
+      },
+      taxAmount: {
+        type: Number,
+        default: null
+      },
+      gstNumber: {
+        type: String,
+        default: null
+      }
+    },
+    confidenceScores: {
+      invoiceNumber: {
+        type: Number,
+        default: null
+      },
+      poNumber: {
+        type: Number,
+        default: null
+      },
+      vendorName: {
+        type: Number,
+        default: null
+      },
+      invoiceDate: {
+        type: Number,
+        default: null
+      },
+      totalAmount: {
+        type: Number,
+        default: null
+      },
+      taxAmount: {
+        type: Number,
+        default: null
+      },
+      gstNumber: {
+        type: Number,
+        default: null
+      }
+    },
+    matchedVendor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Vendor',
+      default: null
+    },
+    matchedPO: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'PurchaseOrder',
+      default: null
+    },
+    uploadedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: [true, 'Uploader user reference is required']
+    },
+    reviewStatus: {
+      type: String,
+      enum: ['PendingReview', 'Reviewed'],
+      required: [true, 'Review status is required'],
+      default: 'PendingReview'
+    },
+    validationStatus: {
+      type: String,
+      enum: ['Pending', 'MissingRequiredFields', 'ReadyForReview', 'Reviewed', 'POMatched'],
+      required: [true, 'Validation status is required'],
+      default: 'Pending'
+    },
+    reviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    reviewedAt: {
+      type: Date,
+      default: null
+    }
+  },
+  {
+    timestamps: true
+  }
+);
+
+const Invoice = mongoose.model('Invoice', invoiceSchema);
+
+export default Invoice;

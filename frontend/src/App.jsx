@@ -13,7 +13,8 @@ import EditPurchaseOrderPage from './pages/EditPurchaseOrderPage.jsx';
 import InvoicesPage from './pages/InvoicesPage.jsx';
 import UploadInvoicePage from './pages/UploadInvoicePage.jsx';
 import InvoiceDetailsPage from './pages/InvoiceDetailsPage.jsx';
-import InvoiceReviewPage from './pages/InvoiceReviewPage.jsx';
+import ValidationWorkspacePage from './pages/ValidationWorkspacePage.jsx';
+import ValidationQueuePage from './pages/ValidationQueuePage.jsx';
 import VendorsPage from './pages/VendorsPage.jsx';
 
 /**
@@ -135,12 +136,25 @@ function App() {
           />
 
           <Route
-            path="/review/:invoiceId"
+            path="/validation/:invoiceId"
             element={
               <ProtectedRoute>
                 <RoleProtectedRoute allowedRoles={['Admin', 'Manager', 'AccountsExecutive']}>
                   <MainLayout>
-                    <InvoiceReviewPage />
+                    <ValidationWorkspacePage />
+                  </MainLayout>
+                </RoleProtectedRoute>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/validation"
+            element={
+              <ProtectedRoute>
+                <RoleProtectedRoute allowedRoles={['Admin', 'Manager', 'AccountsExecutive']}>
+                  <MainLayout>
+                    <ValidationQueuePage />
                   </MainLayout>
                 </RoleProtectedRoute>
               </ProtectedRoute>

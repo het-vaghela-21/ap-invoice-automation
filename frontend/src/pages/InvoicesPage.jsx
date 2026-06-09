@@ -112,7 +112,9 @@ const InvoicesPage = () => {
     MissingRequiredFields: 'bg-rose-50 text-rose-750 border-rose-250',
     ReadyForReview: 'bg-blue-50 text-blue-750 border-blue-200',
     Reviewed: 'bg-emerald-50 text-emerald-750 border-emerald-250',
-    POMatched: 'bg-purple-50 text-purple-750 border-purple-250'
+    POMatched: 'bg-purple-50 text-purple-750 border-purple-250',
+    ReadyForPayment: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    Rejected: 'bg-rose-50 text-rose-700 border-rose-200'
   };
 
   return (
@@ -243,11 +245,21 @@ const InvoicesPage = () => {
                       </td>
                       <td className="px-6 py-4">
                         <span className={`px-2.5 py-1 text-xs font-semibold rounded-full border ${
-                          inv.reviewStatus === 'Reviewed'
+                          inv.reviewStatus === 'ReadyForPayment'
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : 'bg-yellow-50 text-yellow-750 border-yellow-250'
+                            : inv.reviewStatus === 'Reviewed'
+                            ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                            : inv.reviewStatus === 'Awaiting Review'
+                            ? 'bg-yellow-50 text-yellow-750 border-yellow-200'
+                            : 'bg-slate-50 text-slate-600 border-slate-200'
                         }`}>
-                          {inv.reviewStatus === 'Reviewed' ? 'Reviewed' : 'Pending Review'}
+                          {inv.reviewStatus === 'ReadyForPayment' 
+                            ? 'Ready For Payment' 
+                            : inv.reviewStatus === 'Awaiting Review' 
+                            ? 'Awaiting Review'
+                            : inv.reviewStatus === 'Awaiting Extraction'
+                            ? 'Awaiting Extraction'
+                            : inv.reviewStatus || 'Pending Review'}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -258,23 +270,13 @@ const InvoicesPage = () => {
                       <td className="px-6 py-4 text-slate-600">{uploadedByName}</td>
                       <td className="px-6 py-4 text-right space-x-2">
                         <Link
-                          to={`/review/${inv._id}`}
-                          className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
-                            inv.reviewStatus === 'Reviewed'
-                              ? 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-250'
-                              : 'bg-brand-600 hover:bg-brand-500 text-white border-brand-600 hover:border-brand-500 shadow-sm'
-                          }`}
-                          id={`review-btn-${inv._id}`}
-                        >
-                          {inv.reviewStatus === 'Reviewed' ? 'View Review' : 'Review Invoice'}
-                        </Link>
-                        <Link
                           to={`/invoices/${inv._id}`}
-                          className="inline-flex p-2 text-slate-400 hover:text-brand-650 hover:bg-brand-50 rounded-lg transition-colors"
+                          className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-250 shadow-sm"
                           title="View Details"
                           id={`view-invoice-details-${inv.originalFileName}`}
                         >
-                          <FileText className="h-4.5 w-4.5" />
+                          <FileText className="h-3.5 w-3.5" />
+                          <span>View Details</span>
                         </Link>
                         {canDelete && (
                           <button

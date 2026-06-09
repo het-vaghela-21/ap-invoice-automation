@@ -28,6 +28,8 @@ const invoiceService = {
       originalFileName: file.originalname,
       extractionStatus: 'Pending',
       matchingStatus: 'NotMatched',
+      reviewStatus: 'Awaiting Extraction',
+      validationStatus: 'Pending',
       extractedData: {
         invoiceNumber: null,
         poNumber: null,
@@ -153,60 +155,22 @@ const invoiceService = {
 
       const { extractedData, confidenceScores, extractionStatus } = data;
 
-      // Extract metadata fields from OCR response
-      const extractedVendorName = extractedData && extractedData.vendorName ? extractedData.vendorName.trim() : '';
-      const extractedGstNumber = extractedData && extractedData.gstNumber ? extractedData.gstNumber.trim() : '';
-
-      let matchedVendor = null;
-      let validationStatus = 'Pending';
-      let vendor = null;
-
-      // 1. Match by GSTIN if available
-      if (extractedGstNumber) {
-        vendor = await Vendor.findOne({
-          vendorGST: { $regex: new RegExp("^" + extractedGstNumber.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + "$", "i") }
-        });
-      }
-
-      // 2. Fallback: Exact case-insensitive vendor name match
-      if (!vendor && extractedVendorName) {
-        vendor = await Vendor.findOne({
-          vendorName: { $regex: new RegExp("^" + extractedVendorName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + "$", "i") }
-        });
-      }
-
-      // 3. Fallback: Substring case-insensitive name match against active vendors
-      if (!vendor && extractedVendorName) {
-        const allVendors = await Vendor.find({ isActive: true });
-        vendor = allVendors.find(v => {
-          const vName = v.vendorName.toLowerCase().trim();
-          const extName = extractedVendorName.toLowerCase().trim();
-          return vName.includes(extName) || extName.includes(vName);
-        });
-      }
-
-      if (vendor) {
-        matchedVendor = vendor._id;
-        // Run Validation Service
-        const valResult = validationService.validateFields(extractedData, vendor.mandatoryFields);
-        validationStatus = valResult.isValid ? 'ReadyForReview' : 'MissingRequiredFields';
-      } else {
-        validationStatus = 'MissingRequiredFields';
-      }
-
-      // Update Invoice record in DB
+      // Update Invoice record in DB (without pre-review matching or validation)
       await Invoice.findByIdAndUpdate(id, {
         extractedData: {
           ...extractedData,
-          gstNumber: extractedData.gstNumber || null
+          gstNumber: extractedData?.gstNumber || null
         },
         confidenceScores: {
           ...confidenceScores,
-          gstNumber: confidenceScores.gstNumber || null
+          gstNumber: confidenceScores?.gstNumber || null
         },
-        matchedVendor,
-        validationStatus,
-        extractionStatus: extractionStatus || 'Completed'
+        matchedVendor: null,
+        matchedPO: null,
+        validationStatus: 'Pending',
+        matchingStatus: 'NotMatched',
+        extractionStatus: extractionStatus || 'Completed',
+        reviewStatus: (extractionStatus || 'Completed') === 'Completed' ? 'Awaiting Review' : 'Awaiting Extraction'
       });
       console.log(`[ML Pipeline] Successful extraction update for invoice: ${id}`);
     } catch (err) {

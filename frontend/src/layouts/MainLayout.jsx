@@ -18,10 +18,9 @@ const MainLayout = ({ children }) => {
     ...(user?.role !== 'Employee' ? [
       { name: 'Vendors', href: '/vendors', icon: FileText },
       { name: 'Purchase Orders', href: '/purchase-orders', icon: FileSpreadsheet },
-      { name: 'Invoices', href: '/invoices', icon: FileSpreadsheet }
+      { name: 'Invoices', href: '/invoices', icon: FileSpreadsheet },
+      { name: 'Invoice Validation', href: '/validation', icon: RefreshCw }
     ] : []),
-    { name: 'OCR Extraction', href: '#ocr', icon: Cpu, badge: 'Soon' },
-    { name: 'Approval Flows', href: '#approvals', icon: RefreshCw, badge: 'Soon' },
     { name: 'System Settings', href: '#settings', icon: Settings },
   ];
 
@@ -66,10 +65,14 @@ const MainLayout = ({ children }) => {
         <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
           {navigation.map((item) => {
             const isActive = location.pathname === item.href || (item.href === '/' && location.pathname === '/');
+            const isHash = item.href.startsWith('#');
+            const LinkComponent = isHash ? 'a' : Link;
+            const linkProps = isHash ? { href: item.href } : { to: item.href };
+
             return (
-              <a
+              <LinkComponent
                 key={item.name}
-                href={item.href}
+                {...linkProps}
                 className={`
                   group flex items-center justify-between px-4 py-3 text-sm font-medium rounded-xl transition-all duration-150
                   ${isActive 
@@ -86,7 +89,7 @@ const MainLayout = ({ children }) => {
                     {item.badge}
                   </span>
                 )}
-              </a>
+              </LinkComponent>
             );
           })}
         </nav>

@@ -4,7 +4,7 @@ import invoiceService from '../services/invoiceService';
 import { useAuth } from '../context/AuthContext';
 import { 
   ArrowLeft, Cpu, AlertCircle, Calendar, 
-  User, Loader2, Download 
+  User, Loader2, Download, CheckCircle2, ArrowRight
 } from 'lucide-react';
 
 const InvoiceDetailsPage = () => {
@@ -164,6 +164,26 @@ const InvoiceDetailsPage = () => {
         <div className="bg-rose-50 border border-rose-200 text-rose-800 p-4 rounded-xl flex items-start space-x-3 text-sm animate-fade-in" id="error-alert">
           <AlertCircle className="h-5 w-5 shrink-0 text-rose-500" />
           <span>{error}</span>
+        </div>
+      )}
+
+      {invoice.extractionStatus === 'Completed' && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-5 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 animate-fade-in shadow-sm" id="extraction-complete-alert">
+          <div className="flex items-start space-x-3 text-sm">
+            <CheckCircle2 className="h-5.5 w-5.5 shrink-0 text-emerald-500 mt-0.5" />
+            <div>
+              <h4 className="font-bold text-emerald-950 text-base">Text Extraction Complete!</h4>
+              <p className="text-emerald-700 text-sm mt-0.5">The OCR pipeline has finished extracting raw data from the invoice. It is now awaiting human review and validation in the Validation queue.</p>
+            </div>
+          </div>
+          <Link
+            to={`/validation/${id}`}
+            className="shrink-0 inline-flex items-center space-x-2 px-4.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm transition-all shadow-md shadow-emerald-600/10 active:scale-[0.98]"
+            id="review-now-btn"
+          >
+            <span>Review & Validate</span>
+            <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
       )}
 
@@ -338,6 +358,20 @@ const InvoiceDetailsPage = () => {
                     <span className="text-slate-400 uppercase font-semibold">Confidence: </span>
                     <span className={getConfidenceColor(invoice.confidenceScores?.taxAmount)}>
                       {invoice.confidenceScores?.taxAmount !== null ? `${invoice.confidenceScores.taxAmount}%` : '-'}
+                    </span>
+                  </span>
+                </div>
+
+                {/* GST Number */}
+                <div className="grid grid-cols-3 p-3 text-sm items-center hover:bg-slate-50/60 transition-colors">
+                  <span className="font-medium text-slate-500">GST Number</span>
+                  <span className="font-semibold text-slate-800 truncate px-2" id="extracted-gst-number">
+                    {invoice.extractedData?.gstNumber || <span className="text-slate-300 italic font-normal">Not Found</span>}
+                  </span>
+                  <span className="text-right text-xs">
+                    <span className="text-slate-400 uppercase font-semibold">Confidence: </span>
+                    <span className={getConfidenceColor(invoice.confidenceScores?.gstNumber)}>
+                      {invoice.confidenceScores?.gstNumber !== null ? `${invoice.confidenceScores.gstNumber}%` : '-'}
                     </span>
                   </span>
                 </div>

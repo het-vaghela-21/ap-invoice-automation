@@ -8,7 +8,7 @@ import healthRoutes from './src/routes/healthRoutes.js';
 import authRoutes from './src/routes/authRoutes.js';
 import poRoutes from './src/routes/poRoutes.js';
 import invoiceRoutes from './src/routes/invoiceRoutes.js';
-import reviewRoutes from './src/routes/reviewRoutes.js';
+import validationRoutes from './src/routes/validationRoutes.js';
 import vendorRoutes from './src/routes/vendorRoutes.js';
 import errorHandler from './src/middleware/errorHandler.js';
 
@@ -38,7 +38,7 @@ app.use('/api', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/po', poRoutes);
 app.use('/api/invoices', invoiceRoutes);
-app.use('/api/review', reviewRoutes);
+app.use('/api/validation', validationRoutes);
 app.use('/api/vendors', vendorRoutes);
 
 // Expose uploads directory statically for local storage fallback

@@ -104,15 +104,25 @@ const invoiceSchema = new mongoose.Schema(
     },
     reviewStatus: {
       type: String,
-      enum: ['PendingReview', 'Reviewed'],
+      enum: ['PendingReview', 'Awaiting Extraction', 'Awaiting Review', 'Reviewed', 'ReadyForPayment'],
       required: [true, 'Review status is required'],
-      default: 'PendingReview'
+      default: 'Awaiting Extraction'
     },
     validationStatus: {
       type: String,
-      enum: ['Pending', 'MissingRequiredFields', 'ReadyForReview', 'Reviewed', 'POMatched'],
+      enum: ['Pending', 'MissingRequiredFields', 'ReadyForReview', 'Reviewed', 'POMatched', 'ReadyForPayment', 'Rejected'],
       required: [true, 'Validation status is required'],
       default: 'Pending'
+    },
+    invoiceDecision: {
+      type: String,
+      enum: ['Pending', 'Accepted', 'Rejected'],
+      default: 'Pending',
+      required: [true, 'Invoice decision is required']
+    },
+    vendorSimilarityScore: {
+      type: Number,
+      default: 0
     },
     reviewedBy: {
       type: mongoose.Schema.Types.ObjectId,

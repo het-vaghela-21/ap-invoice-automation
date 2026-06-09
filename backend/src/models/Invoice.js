@@ -145,10 +145,19 @@ const invoiceSchema = new mongoose.Schema(
           type: String,
           required: true
         },
-        updatedAt: {
+        changedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+          default: null
+        },
+        changedAt: {
           type: Date,
           default: Date.now,
           required: true
+        },
+        notes: {
+          type: String,
+          default: ''
         }
       }
     ],
@@ -172,7 +181,9 @@ invoiceSchema.pre('save', function (next) {
     if (!this.statusHistory || this.statusHistory.length === 0) {
       this.statusHistory = [{
         status: this.currentStatus,
-        updatedAt: new Date()
+        changedBy: this.uploadedBy || null,
+        changedAt: new Date(),
+        notes: 'Initial invoice upload.'
       }];
     }
     this.lastUpdatedAt = new Date();
@@ -180,10 +191,6 @@ invoiceSchema.pre('save', function (next) {
     if (!this._isWorkflowTransition) {
       return next(new Error('Direct status updates are not allowed. Please use WorkflowService.'));
     }
-    this.statusHistory.push({
-      status: this.currentStatus,
-      updatedAt: new Date()
-    });
     this.lastUpdatedAt = new Date();
   }
   next();

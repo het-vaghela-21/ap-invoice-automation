@@ -32,6 +32,10 @@ const auditLogSchema = new mongoose.Schema(
     notes: {
       type: String,
       default: ''
+    },
+    metadata: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {}
     }
   },
   {

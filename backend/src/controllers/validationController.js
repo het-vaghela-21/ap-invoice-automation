@@ -189,8 +189,11 @@ export const saveChanges = async (req, res, next) => {
       invoice.matchedVendor = null;
     }
 
-    // Transition status to UnderReview (handles save and logs action)
-    await workflowService.transitionTo(invoice, 'UnderReview', req.user._id, 'Saved modifications to extracted fields.', 'Status Change');
+    // Save fields before workflow transition
+    await invoice.save();
+
+    // Transition status to UnderReview (handles statusHistory and logs action)
+    await workflowService.changeInvoiceStatus(invoice._id, 'UnderReview', req.user._id, 'Saved modifications to extracted fields.');
 
     res.status(200).json({
       status: 'success',
@@ -241,20 +244,20 @@ export const reRunValidation = async (req, res, next) => {
 
     // Run Engine
     const result = await runValidationEngine(invoice, candidateData, vendorId);
-    invoice.extractedData = candidateData;
+    // Save matching fields in DB before transition
+    await invoice.save();
 
     // Log validation and matching events
-    await workflowService.logAction(invoice._id, 'Vendor Match', req.user._id, `Vendor similarity score: ${result.vendorSimilarityScore}%. Vendor: ${invoice.extractedData.vendorName || 'N/A'}`);
-    await workflowService.logAction(invoice._id, 'PO Match', req.user._id, `PO matching status: ${invoice.matchingStatus}. PO matched: ${result.poMatched ? 'YES' : 'NO'}`);
-    await workflowService.logAction(invoice._id, 'Validation', req.user._id, `Mandatory fields validation: ${result.missingFields.length === 0 ? 'PASS' : `FAIL (Missing: ${result.missingFields.join(', ')})`}`);
+    await workflowService.logAction(invoice._id, 'Vendor Match Completed', req.user._id, `Vendor similarity score: ${result.vendorSimilarityScore}%. Vendor: ${invoice.extractedData.vendorName || 'N/A'}`);
+    await workflowService.logAction(invoice._id, 'PO Match Completed', req.user._id, `PO matching status: ${invoice.matchingStatus}. PO matched: ${result.poMatched ? 'YES' : 'NO'}`);
 
-    // Transition status
+    // Transition status (automatically logs 'Invoice Validated' or 'Status Changed')
     const targetStatus = result.isValid ? 'Validated' : 'Exception';
     const transitionNotes = result.isValid 
       ? 'Invoice validation checks passed successfully.' 
       : `Invoice validation failed. Mismatches/warnings detected: ${result.missingFields.length > 0 ? `Missing: ${result.missingFields.join(', ')}` : ''} ${!result.poMatched ? 'PO Mismatch' : ''} ${!result.isVendorMatchPass ? 'Low vendor similarity score' : ''}`;
 
-    await workflowService.transitionTo(invoice, targetStatus, req.user._id, transitionNotes, 'Status Change');
+    await workflowService.changeInvoiceStatus(invoice._id, targetStatus, req.user._id, transitionNotes);
 
     res.status(200).json({
       status: 'success',
@@ -328,7 +331,11 @@ export const finalizeInvoice = async (req, res, next) => {
     invoice.reviewedBy = req.user._id;
     invoice.reviewedAt = new Date();
 
-    await workflowService.transitionTo(invoice, 'ReadyForPayment', req.user._id, 'Invoice finalized and approved for payment.', 'Finalization');
+    // Save locked fields before workflow transition
+    await invoice.save();
+
+    // Transition status to ReadyForPayment (automatically logs 'Invoice Finalized')
+    await workflowService.changeInvoiceStatus(invoice._id, 'ReadyForPayment', req.user._id, 'Invoice finalized and approved for payment.');
 
     res.status(200).json({
       status: 'success',
@@ -387,7 +394,11 @@ export const rejectInvoice = async (req, res, next) => {
     invoice.reviewedBy = req.user._id;
     invoice.reviewedAt = new Date();
 
-    await workflowService.transitionTo(invoice, 'Exception', req.user._id, 'Invoice manually rejected.', 'Status Change');
+    // Save rejected fields before workflow transition
+    await invoice.save();
+
+    // Transition status to Exception (automatically logs 'Status Changed')
+    await workflowService.changeInvoiceStatus(invoice._id, 'Exception', req.user._id, 'Invoice manually rejected.');
 
     res.status(200).json({
       status: 'success',

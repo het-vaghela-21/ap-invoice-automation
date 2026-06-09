@@ -180,18 +180,22 @@ const invoiceService = {
       invoice.matchingStatus = 'NotMatched';
       invoice.extractionStatus = extractionStatus || 'Completed';
 
+      // Save raw extraction changes before transition
+      await invoice.save();
+
       const isCompleted = (extractionStatus || 'Completed') === 'Completed';
       const nextStatus = isCompleted ? 'Extracted' : 'Exception';
       const notes = isCompleted ? 'OCR text extraction completed.' : 'OCR text extraction failed.';
 
-      await workflowService.transitionTo(invoice, nextStatus, null, notes, 'OCR Extraction');
+      await workflowService.changeInvoiceStatus(invoice._id, nextStatus, null, notes);
       console.log(`[ML Pipeline] Successful extraction update for invoice: ${id}`);
     } catch (err) {
       console.error(`[ML Pipeline] Failed for invoice ${id}:`, err.message);
       const invoice = await Invoice.findById(id);
       if (invoice) {
         invoice.extractionStatus = 'Failed';
-        await workflowService.transitionTo(invoice, 'Exception', null, `OCR extraction pipeline failed: ${err.message}`, 'OCR Extraction');
+        await invoice.save();
+        await workflowService.changeInvoiceStatus(invoice._id, 'Exception', null, `OCR extraction pipeline failed: ${err.message}`);
       }
     }
   }

@@ -205,10 +205,7 @@ const InvoicesPage = () => {
                   <th className="px-6 py-4">Original File Name</th>
                   <th className="px-6 py-4">Upload Date</th>
                   <th className="px-6 py-4">Vendor</th>
-                  <th className="px-6 py-4">Extraction Status</th>
-                  <th className="px-6 py-4">Validation Status</th>
-                  <th className="px-6 py-4">Review Status</th>
-                  <th className="px-6 py-4">Matching Status</th>
+                  <th className="px-6 py-4">Workflow Status</th>
                   <th className="px-6 py-4">Uploaded By</th>
                   <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
@@ -234,37 +231,16 @@ const InvoicesPage = () => {
                       <td className="px-6 py-4 text-slate-400 text-xs">{uploadDate}</td>
                       <td className="px-6 py-4 font-semibold text-slate-700">{vendorDisplay}</td>
                       <td className="px-6 py-4">
-                        <span className={`px-2.5 py-1 text-xs font-semibold rounded-full border ${extractionColors[inv.extractionStatus] || 'bg-slate-100'}`}>
-                          {inv.extractionStatus}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2.5 py-1 text-xs font-semibold rounded-full border ${validationColors[inv.validationStatus] || 'bg-slate-105'}`}>
-                          {inv.validationStatus || 'Pending'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2.5 py-1 text-xs font-semibold rounded-full border ${
-                          inv.reviewStatus === 'ReadyForPayment'
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : inv.reviewStatus === 'Reviewed'
-                            ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                            : inv.reviewStatus === 'Awaiting Review'
-                            ? 'bg-yellow-50 text-yellow-750 border-yellow-200'
-                            : 'bg-slate-50 text-slate-600 border-slate-200'
+                        <span className={`px-2.5 py-1 text-[10px] font-extrabold rounded-full border uppercase ${
+                          inv.currentStatus === 'Uploaded' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                          inv.currentStatus === 'Extracted' ? 'bg-indigo-50 text-indigo-750 border-indigo-200' :
+                          inv.currentStatus === 'UnderReview' ? 'bg-amber-50 text-amber-705 border-amber-250' :
+                          inv.currentStatus === 'Validated' ? 'bg-purple-50 text-purple-755 border-purple-250' :
+                          inv.currentStatus === 'ReadyForPayment' ? 'bg-emerald-50 text-emerald-700 border-emerald-250' :
+                          inv.currentStatus === 'Exception' ? 'bg-rose-50 text-rose-700 border-rose-250' :
+                          'bg-slate-50 text-slate-600 border-slate-200'
                         }`}>
-                          {inv.reviewStatus === 'ReadyForPayment' 
-                            ? 'Ready For Payment' 
-                            : inv.reviewStatus === 'Awaiting Review' 
-                            ? 'Awaiting Review'
-                            : inv.reviewStatus === 'Awaiting Extraction'
-                            ? 'Awaiting Extraction'
-                            : inv.reviewStatus || 'Pending Review'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2.5 py-1 text-xs font-semibold rounded-full border ${matchingColors[inv.matchingStatus] || 'bg-slate-100'}`}>
-                          {inv.matchingStatus}
+                          {inv.currentStatus || 'Uploaded'}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-slate-600">{uploadedByName}</td>

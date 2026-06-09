@@ -143,60 +143,72 @@ const ActivityTimeline = ({ invoiceId }) => {
         </span>
       </div>
 
-      <div className="relative pl-6 border-l border-slate-200 space-y-6 ml-2.5 pt-1.5 pb-1.5">
+      <div className="space-y-6">
         {logs.map((log, index) => {
-          const styles = getActionStyles(log.action);
-          const IconComponent = styles.icon;
-          
-          const formattedTime = new Date(log.timestamp).toLocaleString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
+          const timeString = new Date(log.timestamp).toLocaleTimeString('en-US', {
             hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
+            minute: '2-digit'
+          });
+          const dateString = new Date(log.timestamp).toLocaleDateString('en-US', {
+            month: 'short', day: 'numeric', year: 'numeric'
           });
 
+          const userDisplay = log.performedBy 
+            ? `${log.performedBy.firstName} ${log.performedBy.lastName}` 
+            : 'System';
+
+          const hasTransition = log.previousState && log.newState && log.previousState !== log.newState;
+          const statusText = hasTransition 
+            ? `${log.previousState} → ${log.newState}`
+            : (log.newState || log.previousState || '');
+
           return (
-            <div key={log._id || index} className="relative group animate-fade-in" id={`timeline-event-${log._id || index}`}>
-              {/* Dot Icon badge */}
-              <div className={`absolute -left-[35px] top-0.5 w-7.5 h-7.5 w-7 h-7 rounded-full border flex items-center justify-center shadow-sm z-10 transition-transform group-hover:scale-105 ${styles.bgColor}`}>
-                <IconComponent className="h-3.5 w-3.5" />
+            <div key={log._id || index} className="space-y-1.5 animate-fade-in" id={`timeline-event-${log._id || index}`}>
+              {/* Time */}
+              <div className="text-xs font-bold text-slate-400 flex items-center space-x-1">
+                <span>{timeString}</span>
+                <span className="font-medium text-slate-300">({dateString})</span>
               </div>
 
-              {/* Event Body */}
-              <div className="space-y-1">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center space-x-2 flex-wrap">
-                    <span className="font-extrabold text-sm text-slate-850">{log.action}</span>
-                    
-                    {log.previousState !== log.newState && log.newState && (
-                      <span className={`inline-flex px-1.5 py-0.5 text-[9px] font-extrabold rounded uppercase border ${getStatusColor(log.newState)}`}>
-                        {log.newState}
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-[10px] text-slate-400 font-semibold">{formattedTime}</span>
-                </div>
+              {/* Action */}
+              <div className="text-sm font-extrabold text-slate-800 tracking-tight">
+                {log.action}
+              </div>
 
-                <p className="text-xs text-slate-600 leading-relaxed font-medium bg-slate-50/50 border border-slate-100 p-2.5 rounded-xl">
+              {/* User */}
+              <div className="text-xs text-slate-500 font-semibold flex items-center space-x-1">
+                <span>By:</span>
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${log.performedBy ? 'bg-slate-100 text-slate-700 border border-slate-200' : 'bg-indigo-50 text-indigo-700 border border-indigo-150'}`}>
+                  {userDisplay}
+                </span>
+              </div>
+
+              {/* Status Transition */}
+              {statusText && (
+                <div className="text-xs font-extrabold mt-1">
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] uppercase font-extrabold border ${
+                    log.newState === 'ReadyForPayment' 
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-250'
+                      : log.newState === 'Exception'
+                      ? 'bg-rose-50 text-rose-700 border-rose-250'
+                      : 'bg-slate-50 text-slate-700 border-slate-200'
+                  }`}>
+                    {statusText}
+                  </span>
+                </div>
+              )}
+
+              {/* Notes */}
+              {log.notes && (
+                <div className="text-xs text-slate-600 font-medium bg-slate-50/50 border border-slate-100 p-2.5 rounded-xl max-w-xl">
                   {log.notes}
-                </p>
-
-                {/* Performed By Info */}
-                <div className="flex items-center space-x-1.5 text-[10px] text-slate-400 mt-1">
-                  <span className="font-bold">Performed By:</span>
-                  {log.performedBy ? (
-                    <span className="inline-flex items-center bg-slate-100 text-slate-700 border border-slate-200 rounded px-1.5 py-0.5 font-bold">
-                      {log.performedBy.firstName} {log.performedBy.lastName} ({log.performedBy.role})
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center bg-indigo-50 text-indigo-700 border border-indigo-150 rounded px-1.5 py-0.5 font-extrabold tracking-wide uppercase text-[8px]">
-                      System
-                    </span>
-                  )}
                 </div>
-              </div>
+              )}
+
+              {/* Dotted Separator */}
+              {index < logs.length - 1 && (
+                <div className="pt-4 border-b border-dashed border-slate-200/80 max-w-xl"></div>
+              )}
             </div>
           );
         })}

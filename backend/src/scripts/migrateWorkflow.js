@@ -61,7 +61,9 @@ const runWorkflowMigration = async () => {
       invoice.currentStatus = nextStatus;
       invoice.statusHistory = [{
         status: nextStatus,
-        updatedAt: invoice.updatedAt || new Date()
+        changedBy: invoice.reviewedBy || invoice.uploadedBy || null,
+        changedAt: invoice.updatedAt || new Date(),
+        notes: `Status initialized and migrated to "${nextStatus}" during system upgrade.`
       }];
       invoice.lastUpdatedAt = invoice.updatedAt || new Date();
       invoice._isWorkflowTransition = true; // bypass schema pre-save validator
@@ -72,12 +74,13 @@ const runWorkflowMigration = async () => {
       // Create initial Migration Audit Log entry
       const auditLog = new AuditLog({
         invoiceId: invoice._id,
-        action: 'Status Change',
+        action: 'Status Changed',
         previousState: null,
         newState: nextStatus,
         performedBy: invoice.reviewedBy || invoice.uploadedBy || null,
         timestamp: invoice.updatedAt || new Date(),
-        notes: `Status initialized and migrated to "${nextStatus}" during system upgrade.`
+        notes: `Status initialized and migrated to "${nextStatus}" during system upgrade.`,
+        metadata: {}
       });
       await auditLog.save();
 
@@ -86,24 +89,26 @@ const runWorkflowMigration = async () => {
         // Log the initial upload action
         await new AuditLog({
           invoiceId: invoice._id,
-          action: 'Invoice Upload',
+          action: 'Invoice Uploaded',
           previousState: null,
           newState: 'Uploaded',
           performedBy: invoice.uploadedBy || null,
           timestamp: invoice.createdAt || new Date(),
-          notes: 'Invoice uploaded during initial ingestion.'
+          notes: 'Invoice uploaded during initial ingestion.',
+          metadata: {}
         }).save();
 
         // Log extraction
         if (invoice.extractionStatus === 'Completed') {
           await new AuditLog({
             invoiceId: invoice._id,
-            action: 'OCR Extraction',
+            action: 'OCR Extraction Completed',
             previousState: 'Uploaded',
             newState: 'Extracted',
             performedBy: null,
             timestamp: invoice.createdAt || new Date(),
-            notes: 'OCR document data extracted.'
+            notes: 'OCR document data extracted.',
+            metadata: {}
           }).save();
         }
       }

@@ -3,6 +3,7 @@ import Vendor from '../models/Vendor.js';
 import PurchaseOrder from '../models/PurchaseOrder.js';
 import validationService from '../services/validationService.js';
 import { getFuzzySimilarityScore } from '../utils/fuzzyMatching.js';
+import workflowService from '../services/workflowService.js';
 
 /**
  * Helper to execute full validation & matching checks on an invoice.
@@ -162,7 +163,8 @@ export const saveChanges = async (req, res, next) => {
     }
 
     // Check Lock State
-    if (invoice.reviewStatus === 'ReadyForPayment' || invoice.invoiceDecision === 'Rejected') {
+    const isLocked = invoice.currentStatus === 'ReadyForPayment' || (invoice.currentStatus === 'Exception' && invoice.invoiceDecision === 'Rejected') || invoice.reviewStatus === 'ReadyForPayment' || invoice.invoiceDecision === 'Rejected';
+    if (isLocked) {
       return res.status(400).json({
         status: 'error',
         message: 'This invoice is finalized or rejected and cannot be modified.'
@@ -187,7 +189,8 @@ export const saveChanges = async (req, res, next) => {
       invoice.matchedVendor = null;
     }
 
-    await invoice.save();
+    // Transition status to UnderReview (handles save and logs action)
+    await workflowService.transitionTo(invoice, 'UnderReview', req.user._id, 'Saved modifications to extracted fields.', 'Status Change');
 
     res.status(200).json({
       status: 'success',
@@ -218,7 +221,8 @@ export const reRunValidation = async (req, res, next) => {
     }
 
     // Check Lock State
-    if (invoice.reviewStatus === 'ReadyForPayment' || invoice.invoiceDecision === 'Rejected') {
+    const isLocked = invoice.currentStatus === 'ReadyForPayment' || (invoice.currentStatus === 'Exception' && invoice.invoiceDecision === 'Rejected') || invoice.reviewStatus === 'ReadyForPayment' || invoice.invoiceDecision === 'Rejected';
+    if (isLocked) {
       return res.status(400).json({
         status: 'error',
         message: 'This invoice is finalized or rejected and cannot be modified.'
@@ -237,10 +241,20 @@ export const reRunValidation = async (req, res, next) => {
 
     // Run Engine
     const result = await runValidationEngine(invoice, candidateData, vendorId);
-
-    // Save intermediate matching state in DB
     invoice.extractedData = candidateData;
-    await invoice.save();
+
+    // Log validation and matching events
+    await workflowService.logAction(invoice._id, 'Vendor Match', req.user._id, `Vendor similarity score: ${result.vendorSimilarityScore}%. Vendor: ${invoice.extractedData.vendorName || 'N/A'}`);
+    await workflowService.logAction(invoice._id, 'PO Match', req.user._id, `PO matching status: ${invoice.matchingStatus}. PO matched: ${result.poMatched ? 'YES' : 'NO'}`);
+    await workflowService.logAction(invoice._id, 'Validation', req.user._id, `Mandatory fields validation: ${result.missingFields.length === 0 ? 'PASS' : `FAIL (Missing: ${result.missingFields.join(', ')})`}`);
+
+    // Transition status
+    const targetStatus = result.isValid ? 'Validated' : 'Exception';
+    const transitionNotes = result.isValid 
+      ? 'Invoice validation checks passed successfully.' 
+      : `Invoice validation failed. Mismatches/warnings detected: ${result.missingFields.length > 0 ? `Missing: ${result.missingFields.join(', ')}` : ''} ${!result.poMatched ? 'PO Mismatch' : ''} ${!result.isVendorMatchPass ? 'Low vendor similarity score' : ''}`;
+
+    await workflowService.transitionTo(invoice, targetStatus, req.user._id, transitionNotes, 'Status Change');
 
     res.status(200).json({
       status: 'success',
@@ -274,7 +288,8 @@ export const finalizeInvoice = async (req, res, next) => {
     }
 
     // Check Lock State
-    if (invoice.reviewStatus === 'ReadyForPayment' || invoice.invoiceDecision === 'Rejected') {
+    const isLocked = invoice.currentStatus === 'ReadyForPayment' || (invoice.currentStatus === 'Exception' && invoice.invoiceDecision === 'Rejected') || invoice.reviewStatus === 'ReadyForPayment' || invoice.invoiceDecision === 'Rejected';
+    if (isLocked) {
       return res.status(400).json({
         status: 'error',
         message: 'This invoice is already finalized or rejected.'
@@ -309,13 +324,11 @@ export const finalizeInvoice = async (req, res, next) => {
 
     // Lock and Finalize
     invoice.extractedData = candidateData;
-    invoice.reviewStatus = 'ReadyForPayment';
-    invoice.validationStatus = 'ReadyForPayment';
     invoice.invoiceDecision = 'Accepted';
     invoice.reviewedBy = req.user._id;
     invoice.reviewedAt = new Date();
 
-    await invoice.save();
+    await workflowService.transitionTo(invoice, 'ReadyForPayment', req.user._id, 'Invoice finalized and approved for payment.', 'Finalization');
 
     res.status(200).json({
       status: 'success',
@@ -346,7 +359,8 @@ export const rejectInvoice = async (req, res, next) => {
     }
 
     // Check Lock State
-    if (invoice.reviewStatus === 'ReadyForPayment' || invoice.invoiceDecision === 'Rejected') {
+    const isLocked = invoice.currentStatus === 'ReadyForPayment' || (invoice.currentStatus === 'Exception' && invoice.invoiceDecision === 'Rejected') || invoice.reviewStatus === 'ReadyForPayment' || invoice.invoiceDecision === 'Rejected';
+    if (isLocked) {
       return res.status(400).json({
         status: 'error',
         message: 'This invoice is already finalized or rejected.'
@@ -369,13 +383,11 @@ export const rejectInvoice = async (req, res, next) => {
 
     // Lock and Reject
     invoice.extractedData = candidateData;
-    invoice.reviewStatus = 'Reviewed';
-    invoice.validationStatus = 'Rejected';
     invoice.invoiceDecision = 'Rejected';
     invoice.reviewedBy = req.user._id;
     invoice.reviewedAt = new Date();
 
-    await invoice.save();
+    await workflowService.transitionTo(invoice, 'Exception', req.user._id, 'Invoice manually rejected.', 'Status Change');
 
     res.status(200).json({
       status: 'success',

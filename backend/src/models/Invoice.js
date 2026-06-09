@@ -132,12 +132,62 @@ const invoiceSchema = new mongoose.Schema(
     reviewedAt: {
       type: Date,
       default: null
+    },
+    currentStatus: {
+      type: String,
+      enum: ['Uploaded', 'Extracted', 'UnderReview', 'Validated', 'ReadyForPayment', 'Exception'],
+      required: [true, 'Current status is required'],
+      default: 'Uploaded'
+    },
+    statusHistory: [
+      {
+        status: {
+          type: String,
+          required: true
+        },
+        updatedAt: {
+          type: Date,
+          default: Date.now,
+          required: true
+        }
+      }
+    ],
+    lastUpdatedAt: {
+      type: Date,
+      default: Date.now,
+      required: true
     }
   },
   {
     timestamps: true
   }
 );
+
+// Pre-save middleware to enforce that currentStatus can only be modified through WorkflowService
+invoiceSchema.pre('save', function (next) {
+  if (this.isNew) {
+    if (!this.currentStatus) {
+      this.currentStatus = 'Uploaded';
+    }
+    if (!this.statusHistory || this.statusHistory.length === 0) {
+      this.statusHistory = [{
+        status: this.currentStatus,
+        updatedAt: new Date()
+      }];
+    }
+    this.lastUpdatedAt = new Date();
+  } else if (this.isModified('currentStatus')) {
+    if (!this._isWorkflowTransition) {
+      return next(new Error('Direct status updates are not allowed. Please use WorkflowService.'));
+    }
+    this.statusHistory.push({
+      status: this.currentStatus,
+      updatedAt: new Date()
+    });
+    this.lastUpdatedAt = new Date();
+  }
+  next();
+});
 
 const Invoice = mongoose.model('Invoice', invoiceSchema);
 

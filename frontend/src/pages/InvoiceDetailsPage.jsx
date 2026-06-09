@@ -6,6 +6,7 @@ import {
   ArrowLeft, Cpu, AlertCircle, Calendar, 
   User, Loader2, Download, CheckCircle2, ArrowRight
 } from 'lucide-react';
+import ActivityTimeline from '../components/ActivityTimeline';
 
 const InvoiceDetailsPage = () => {
   const { id } = useParams();
@@ -379,6 +380,11 @@ const InvoiceDetailsPage = () => {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Activity & Workflow Timeline Section */}
+      <div className="max-w-4xl lg:max-w-none">
+        <ActivityTimeline invoiceId={id} />
       </div>
     </div>
   );

@@ -2,6 +2,7 @@ import Invoice from '../models/Invoice.js';
 import Vendor from '../models/Vendor.js';
 import validationService from './validationService.js';
 import { uploadFile, deleteFile } from '../config/cloudinary.js';
+import workflowService from './workflowService.js';
 
 /**
  * Reusable Service Layer for Invoice Management (Refactored for True Automation & OCR)
@@ -30,6 +31,9 @@ const invoiceService = {
       matchingStatus: 'NotMatched',
       reviewStatus: 'Awaiting Extraction',
       validationStatus: 'Pending',
+      currentStatus: 'Uploaded',
+      statusHistory: [{ status: 'Uploaded', updatedAt: new Date() }],
+      lastUpdatedAt: new Date(),
       extractedData: {
         invoiceNumber: null,
         poNumber: null,
@@ -49,8 +53,12 @@ const invoiceService = {
       matchedPO: null,
       uploadedBy: userId
     });
+    newInvoice._isWorkflowTransition = true; // allow initial save bypass
 
     const savedInvoice = await newInvoice.save();
+
+    // Log Invoice Upload to AuditLog
+    await workflowService.logAction(savedInvoice._id, 'Invoice Upload', userId, 'Invoice uploaded successfully', null, 'Uploaded');
     return await savedInvoice.populate([
       { path: 'matchedVendor' },
       { path: 'matchedPO', select: 'poNumber vendorName' },
@@ -155,29 +163,36 @@ const invoiceService = {
 
       const { extractedData, confidenceScores, extractionStatus } = data;
 
-      // Update Invoice record in DB (without pre-review matching or validation)
-      await Invoice.findByIdAndUpdate(id, {
-        extractedData: {
-          ...extractedData,
-          gstNumber: extractedData?.gstNumber || null
-        },
-        confidenceScores: {
-          ...confidenceScores,
-          gstNumber: confidenceScores?.gstNumber || null
-        },
-        matchedVendor: null,
-        matchedPO: null,
-        validationStatus: 'Pending',
-        matchingStatus: 'NotMatched',
-        extractionStatus: extractionStatus || 'Completed',
-        reviewStatus: (extractionStatus || 'Completed') === 'Completed' ? 'Awaiting Review' : 'Awaiting Extraction'
-      });
+      // Fetch invoice and update raw extraction fields
+      const invoice = await Invoice.findById(id);
+      if (!invoice) throw new Error('Invoice not found');
+
+      invoice.extractedData = {
+        ...extractedData,
+        gstNumber: extractedData?.gstNumber || null
+      };
+      invoice.confidenceScores = {
+        ...confidenceScores,
+        gstNumber: confidenceScores?.gstNumber || null
+      };
+      invoice.matchedVendor = null;
+      invoice.matchedPO = null;
+      invoice.matchingStatus = 'NotMatched';
+      invoice.extractionStatus = extractionStatus || 'Completed';
+
+      const isCompleted = (extractionStatus || 'Completed') === 'Completed';
+      const nextStatus = isCompleted ? 'Extracted' : 'Exception';
+      const notes = isCompleted ? 'OCR text extraction completed.' : 'OCR text extraction failed.';
+
+      await workflowService.transitionTo(invoice, nextStatus, null, notes, 'OCR Extraction');
       console.log(`[ML Pipeline] Successful extraction update for invoice: ${id}`);
     } catch (err) {
       console.error(`[ML Pipeline] Failed for invoice ${id}:`, err.message);
-      await Invoice.findByIdAndUpdate(id, {
-        extractionStatus: 'Failed'
-      });
+      const invoice = await Invoice.findById(id);
+      if (invoice) {
+        invoice.extractionStatus = 'Failed';
+        await workflowService.transitionTo(invoice, 'Exception', null, `OCR extraction pipeline failed: ${err.message}`, 'OCR Extraction');
+      }
     }
   }
 };

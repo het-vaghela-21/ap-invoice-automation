@@ -377,7 +377,17 @@ const ExceptionDetailsPage = () => {
               </div>
               <div>
                 <span className="block text-xs font-semibold text-slate-400 uppercase">Invoice Number</span>
-                <span className="text-slate-800 font-bold mt-1 block">{invoice?.extractedData?.invoiceNumber || 'N/A'}</span>
+                {invoice?._id ? (
+                  <Link 
+                    to={`/workspace/${invoice._id}`}
+                    className="text-brand-650 hover:text-brand-500 font-bold mt-1 block hover:underline"
+                    id="exception-detail-invoice-link"
+                  >
+                    {invoice?.extractedData?.invoiceNumber || 'N/A'}
+                  </Link>
+                ) : (
+                  <span className="text-slate-800 font-bold mt-1 block">{invoice?.extractedData?.invoiceNumber || 'N/A'}</span>
+                )}
               </div>
               <div>
                 <span className="block text-xs font-semibold text-slate-400 uppercase">Extracted Vendor Name</span>

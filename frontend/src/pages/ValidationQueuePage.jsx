@@ -250,7 +250,7 @@ const ValidationQueuePage = () => {
                     <tr key={inv._id} className="group hover:bg-slate-50/40 transition-colors">
                       <td className="px-6 py-4 font-semibold text-slate-800 max-w-[200px] truncate">
                         <Link 
-                          to={`/invoices/${inv._id}`}
+                          to={`/workspace/${inv._id}`}
                           className="text-brand-650 hover:text-brand-500 transition-colors font-semibold"
                         >
                           {inv.originalFileName}

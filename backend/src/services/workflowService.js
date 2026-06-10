@@ -1,5 +1,7 @@
 import Invoice from '../models/Invoice.js';
 import AuditLog from '../models/AuditLog.js';
+import PaymentRecord from '../models/PaymentRecord.js';
+import notificationService from './notificationService.js';
 
 const ALLOWED_TRANSITIONS = {
   'Uploaded': ['Extracted', 'Exception'],
@@ -7,7 +9,8 @@ const ALLOWED_TRANSITIONS = {
   'UnderReview': ['Validated', 'Exception'],
   'Validated': ['ReadyForPayment', 'Exception'],
   'Exception': ['UnderReview', 'Validated', 'Exception'],
-  'ReadyForPayment': []
+  'ReadyForPayment': ['Paid'],
+  'Paid': []
 };
 
 const getActionName = (newStatus, previousStatus) => {
@@ -22,7 +25,9 @@ const getActionName = (newStatus, previousStatus) => {
     case 'Validated':
       return 'Invoice Validated';
     case 'ReadyForPayment':
-      return 'Invoice Finalized';
+      return 'Ready For Payment';
+    case 'Paid':
+      return 'Payment Completed';
     default:
       return 'Status Changed';
   }
@@ -45,9 +50,9 @@ const workflowService = {
 
     const previousStatus = invoice.currentStatus || 'Uploaded';
 
-    // 1. Enforce lock restrictions (ReadyForPayment is terminal)
-    if (previousStatus === 'ReadyForPayment') {
-      throw new Error('Action blocked: Invoice is locked in terminal ReadyForPayment state.');
+    // 1. Enforce lock restrictions (Paid is terminal)
+    if (previousStatus === 'Paid') {
+      throw new Error('Action blocked: Invoice is locked in terminal Paid state.');
     }
 
     // 2. Validate transition
@@ -92,6 +97,22 @@ const workflowService = {
       invoice.reviewStatus = 'ReadyForPayment';
       invoice.validationStatus = 'ReadyForPayment';
       invoice.invoiceDecision = 'Accepted';
+
+      // Auto-create PaymentRecord in Pending status if it doesn't exist
+      const existingPayment = await PaymentRecord.findOne({ invoiceId: invoice._id });
+      if (!existingPayment) {
+        await PaymentRecord.create({
+          invoiceId: invoice._id,
+          vendorId: invoice.matchedVendor,
+          amount: invoice.extractedData?.totalAmount || 0,
+          paymentStatus: 'Pending',
+          notes: 'Pending payment record created automatically on validation.'
+        });
+      }
+    } else if (newStatus === 'Paid') {
+      invoice.reviewStatus = 'Reviewed';
+      invoice.validationStatus = 'ReadyForPayment';
+      invoice.invoiceDecision = 'Accepted';
     } else if (newStatus === 'Exception') {
       invoice.reviewStatus = 'Reviewed';
       if (invoice.invoiceDecision === 'Rejected') {
@@ -120,6 +141,25 @@ const workflowService = {
     });
     await auditLog.save();
 
+    // Trigger notification based on transition status
+    let eventName = null;
+    if (newStatus === 'Extracted') {
+      eventName = 'OCR Extraction Completed';
+    } else if (newStatus === 'Validated') {
+      eventName = 'Validation Passed';
+    } else if (newStatus === 'ReadyForPayment') {
+      eventName = 'Invoice Ready For Payment';
+    } else if (newStatus === 'Paid') {
+      eventName = 'Invoice Marked Paid';
+    } else if (newStatus === 'Exception') {
+      eventName = 'Validation Failed';
+    }
+
+    if (eventName) {
+      // Fire-and-forget triggering in background
+      notificationService.triggerNotificationForInvoice(invoice, eventName, notes);
+    }
+
     return invoice;
   },
 
@@ -146,6 +186,12 @@ const workflowService = {
       metadata
     });
     await auditLog.save();
+
+    // Trigger notifications for key action logs
+    if (action === 'Exception Assigned' || action === 'Exception Resolved') {
+      notificationService.triggerNotificationForInvoice(invoiceId, action, notes, metadata);
+    }
+
     return auditLog;
   }
 };

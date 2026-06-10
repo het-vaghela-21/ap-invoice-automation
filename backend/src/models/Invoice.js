@@ -135,7 +135,7 @@ const invoiceSchema = new mongoose.Schema(
     },
     currentStatus: {
       type: String,
-      enum: ['Uploaded', 'Extracted', 'UnderReview', 'Validated', 'ReadyForPayment', 'Exception'],
+      enum: ['Uploaded', 'Extracted', 'UnderReview', 'Validated', 'ReadyForPayment', 'Exception', 'Paid'],
       required: [true, 'Current status is required'],
       default: 'Uploaded'
     },

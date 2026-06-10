@@ -113,7 +113,8 @@ const DashboardPage = () => {
     UnderReview: '#f59e0b',   // amber
     Validated: '#10b981',     // emerald
     ReadyForPayment: '#8b5cf6', // purple
-    Exception: '#ef4444'      // red
+    Exception: '#ef4444',      // red
+    Paid: '#10b981'            // emerald
   };
 
   const PO_STATUS_COLORS = {
@@ -232,7 +233,7 @@ const DashboardPage = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {isLoading ? (
           // Loading Skeletons
-          Array.from({ length: 7 }).map((_, i) => (
+          Array.from({ length: 10 }).map((_, i) => (
             <div key={i} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm animate-pulse space-y-3">
               <div className="h-3 w-2/5 bg-slate-200 rounded"></div>
               <div className="h-8 w-3/5 bg-slate-300 rounded"></div>
@@ -322,6 +323,42 @@ const DashboardPage = () => {
               </div>
               <div className="p-3.5 bg-rose-50 text-rose-600 rounded-xl">
                 <AlertTriangle className="h-6 w-6" />
+              </div>
+            </div>
+
+            {/* Paid Invoices */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between hover:shadow-md transition-shadow">
+              <div className="space-y-1">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Paid Invoices</span>
+                <div className="text-3xl font-extrabold text-slate-900">{summary?.paidInvoices || 0}</div>
+                <div className="text-[11px] text-slate-400">Completed invoice payments</div>
+              </div>
+              <div className="p-3.5 bg-emerald-50 text-emerald-600 rounded-xl">
+                <DollarSign className="h-6 w-6" />
+              </div>
+            </div>
+
+            {/* Pending Payments */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between hover:shadow-md transition-shadow">
+              <div className="space-y-1">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pending Payments</span>
+                <div className="text-3xl font-extrabold text-slate-900">{summary?.pendingPayments || 0}</div>
+                <div className="text-[11px] text-slate-400">Ready payments to disburse</div>
+              </div>
+              <div className="p-3.5 bg-amber-50 text-amber-600 rounded-xl">
+                <Clock className="h-6 w-6" />
+              </div>
+            </div>
+
+            {/* Payments On Hold */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between hover:shadow-md transition-shadow">
+              <div className="space-y-1">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Payments On Hold</span>
+                <div className="text-3xl font-extrabold text-slate-900">{summary?.paymentsOnHold || 0}</div>
+                <div className="text-[11px] text-slate-400">Blocked pending review</div>
+              </div>
+              <div className="p-3.5 bg-rose-50 text-rose-600 rounded-xl">
+                <AlertOctagon className="h-6 w-6" />
               </div>
             </div>
           </>
@@ -567,7 +604,7 @@ const DashboardPage = () => {
                       <tr 
                         key={inv.id} 
                         className="group hover:bg-slate-50/50 transition-colors cursor-pointer"
-                        onClick={() => navigate(`/invoices/${inv.id}`)}
+                        onClick={() => navigate(`/workspace/${inv.id}`)}
                       >
                         <td className="py-3.5 font-bold text-brand-650 group-hover:underline">{inv.invoiceNumber}</td>
                         <td className="py-3.5 text-slate-800 font-medium truncate max-w-[140px]">{inv.vendor}</td>

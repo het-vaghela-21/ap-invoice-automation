@@ -2,6 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import invoiceService from '../services/invoiceService';
+import vendorService from '../services/vendorService';
+import SavedViewSelector from '../components/SavedViewSelector';
+import FilterPanel from '../components/FilterPanel';
+import ExportButton from '../components/ExportButton';
 import { 
   FileText, Plus, Search, Trash2, 
   AlertCircle, CheckCircle2, Loader2, ArrowRight
@@ -12,10 +16,15 @@ const InvoicesPage = () => {
   const location = useLocation();
   const [invoices, setInvoices] = useState([]);
   const [filteredInvoices, setFilteredInvoices] = useState([]);
+  const [vendors, setVendors] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Predefined Filters & Saved Views
+  const [activeView, setActiveView] = useState('');
+  const [advancedFilters, setAdvancedFilters] = useState(null);
 
   // Deletion modal states
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -34,11 +43,15 @@ const InvoicesPage = () => {
     setIsLoading(true);
     setError('');
     try {
-      const response = await invoiceService.getInvoices();
-      setInvoices(response.data || []);
-      setFilteredInvoices(response.data || []);
+      const [invRes, venRes] = await Promise.all([
+        invoiceService.getInvoices(),
+        vendorService.getVendors()
+      ]);
+      setInvoices(invRes.data || []);
+      setFilteredInvoices(invRes.data || []);
+      setVendors(venRes.data || []);
     } catch (err) {
-      console.error('Error fetching invoices:', err);
+      console.error('Error fetching workspace data:', err);
       setError(err.message || 'Failed to retrieve invoice records.');
     } finally {
       setIsLoading(false);
@@ -49,22 +62,66 @@ const InvoicesPage = () => {
     fetchInvoices();
   }, []);
 
-  // Filter lists locally
+  // Filter lists locally (Search Term + Saved Views + Advanced Filters)
   useEffect(() => {
+    let result = [...invoices];
+
+    // 1. Search term match
     const term = searchTerm.toLowerCase().trim();
-    if (!term) {
-      setFilteredInvoices(invoices);
-    } else {
-      const filtered = invoices.filter(inv => 
+    if (term) {
+      result = result.filter(inv => 
         (inv.originalFileName && inv.originalFileName.toLowerCase().includes(term)) ||
-        (inv.extractionStatus && inv.extractionStatus.toLowerCase().includes(term)) ||
-        (inv.matchingStatus && inv.matchingStatus.toLowerCase().includes(term)) ||
-        (inv.uploadedBy?.firstName && inv.uploadedBy.firstName.toLowerCase().includes(term)) ||
-        (inv.uploadedBy?.lastName && inv.uploadedBy.lastName.toLowerCase().includes(term))
+        (inv.currentStatus && inv.currentStatus.toLowerCase().includes(term)) ||
+        (inv.extractedData?.poNumber && inv.extractedData.poNumber.toLowerCase().includes(term)) ||
+        (inv.extractedData?.vendorName && inv.extractedData.vendorName.toLowerCase().includes(term))
       );
-      setFilteredInvoices(filtered);
     }
-  }, [searchTerm, invoices]);
+
+    // 2. Saved view filter
+    if (activeView) {
+      const viewStatusMap = {
+        'pending-review': 'UnderReview',
+        'exceptions': 'Exception',
+        'ready-payment': 'ReadyForPayment',
+        'paid': 'Paid'
+      };
+      const targetStatus = viewStatusMap[activeView];
+      if (targetStatus) {
+        result = result.filter(inv => inv.currentStatus === targetStatus);
+      }
+    }
+
+    // 3. Advanced filters
+    if (advancedFilters) {
+      const { status, vendorId, poNumber, minAmount, maxAmount, startDate, endDate } = advancedFilters;
+      
+      if (status) {
+        result = result.filter(inv => inv.currentStatus === status);
+      }
+      if (vendorId) {
+        result = result.filter(inv => inv.matchedVendor?._id === vendorId || inv.matchedVendor === vendorId);
+      }
+      if (poNumber) {
+        result = result.filter(inv => inv.extractedData?.poNumber?.toLowerCase().includes(poNumber.toLowerCase()));
+      }
+      if (minAmount !== '' && minAmount !== undefined) {
+        result = result.filter(inv => (inv.extractedData?.totalAmount || 0) >= minAmount);
+      }
+      if (maxAmount !== '' && maxAmount !== undefined) {
+        result = result.filter(inv => (inv.extractedData?.totalAmount || 0) <= maxAmount);
+      }
+      if (startDate) {
+        result = result.filter(inv => new Date(inv.createdAt) >= new Date(startDate));
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        result = result.filter(inv => new Date(inv.createdAt) <= end);
+      }
+    }
+
+    setFilteredInvoices(result);
+  }, [searchTerm, invoices, activeView, advancedFilters]);
 
   const handleDeleteClick = (invoice) => {
     setInvoiceToDelete(invoice);
@@ -117,6 +174,17 @@ const InvoicesPage = () => {
     Rejected: 'bg-rose-50 text-rose-700 border-rose-200'
   };
 
+  const invoiceHeaders = [
+    { label: 'File Name', key: 'originalFileName' },
+    { label: 'Invoice Number', key: 'extractedData.invoiceNumber' },
+    { label: 'Vendor Name', key: 'extractedData.vendorName' },
+    { label: 'PO Number', key: 'extractedData.poNumber' },
+    { label: 'GST Number', key: 'extractedData.gstNumber' },
+    { label: 'Amount (USD)', key: 'extractedData.totalAmount' },
+    { label: 'Status', key: 'currentStatus' },
+    { label: 'Ingested At', key: 'createdAt' }
+  ];
+
   return (
     <div className="space-y-6" id="invoices-page">
       {/* Page Header */}
@@ -147,10 +215,21 @@ const InvoicesPage = () => {
 
       {success && (
         <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-xl flex items-start space-x-3 text-sm animate-fade-in" id="success-alert">
-          <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />
+          <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-505" />
           <span>{success}</span>
         </div>
       )}
+
+      {/* Saved Views Selector */}
+      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        <SavedViewSelector 
+          activeView={activeView} 
+          onViewSelect={(viewId, status) => {
+            setActiveView(viewId === activeView ? '' : viewId);
+            setAdvancedFilters(null);
+          }} 
+        />
+      </div>
 
       {/* Filters area */}
       <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
@@ -163,11 +242,27 @@ const InvoicesPage = () => {
             placeholder="Search by file name, status..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="block w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500/80 transition-all text-sm"
+            className="block w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-805 placeholder-slate-405 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500/80 transition-all text-xs font-semibold"
           />
         </div>
-        <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider bg-slate-50 border border-slate-100 px-3.5 py-2 rounded-xl text-center">
-          Access Role: <span className="text-brand-650 font-bold">{user?.role}</span>
+        <div className="flex items-center space-x-2.5">
+          <FilterPanel 
+            statuses={['Uploaded', 'Extracted', 'UnderReview', 'Validated', 'ReadyForPayment', 'Exception', 'Paid']}
+            vendors={vendors}
+            onApply={(filters) => {
+              setAdvancedFilters(filters);
+              setActiveView('');
+            }}
+            onReset={() => setAdvancedFilters(null)}
+          />
+          <ExportButton 
+            data={filteredInvoices}
+            headers={invoiceHeaders}
+            filename="AP_Invoices_Export"
+          />
+          <div className="hidden lg:block text-xs font-semibold text-slate-450 uppercase tracking-wider bg-slate-50 border border-slate-100 px-3.5 py-2.5 rounded-xl text-center">
+            Access Role: <span className="text-brand-650 font-bold">{user?.role}</span>
+          </div>
         </div>
       </div>
 
@@ -221,7 +316,7 @@ const InvoicesPage = () => {
                     <tr key={inv._id} className="group hover:bg-slate-50/40 transition-colors">
                       <td className="px-6 py-4 font-semibold text-slate-800 max-w-[200px] truncate">
                         <Link 
-                          to={`/invoices/${inv._id}`}
+                          to={`/workspace/${inv._id}`}
                           className="text-brand-650 hover:text-brand-500 font-semibold transition-colors"
                           id={`invoice-name-link-${inv.originalFileName}`}
                         >
@@ -246,7 +341,7 @@ const InvoicesPage = () => {
                       <td className="px-6 py-4 text-slate-600">{uploadedByName}</td>
                       <td className="px-6 py-4 text-right space-x-2">
                         <Link
-                          to={`/invoices/${inv._id}`}
+                          to={`/workspace/${inv._id}`}
                           className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-250 shadow-sm"
                           title="View Details"
                           id={`view-invoice-details-${inv.originalFileName}`}

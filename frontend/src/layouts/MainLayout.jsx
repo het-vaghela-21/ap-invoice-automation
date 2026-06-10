@@ -1,17 +1,85 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   FileText, LayoutDashboard, FileSpreadsheet, 
-  Settings, Menu, X, Bell, LogOut, ChevronDown, Cpu, RefreshCw, AlertTriangle
+  Settings, Menu, X, Bell, LogOut, ChevronDown, Cpu, RefreshCw, AlertTriangle, CreditCard
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import SearchBar from '../components/SearchBar.jsx';
+import NotificationBell from '../components/NotificationBell.jsx';
+import NotificationDropdown from '../components/NotificationDropdown.jsx';
+import notificationService from '../services/notificationService.js';
+import invoiceService from '../services/invoiceService.js';
+import { apiClient } from '../services/authService.js';
 
 const MainLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [activeExceptionsCount, setActiveExceptionsCount] = useState(0);
+  const [readyForPaymentCount, setReadyForPaymentCount] = useState(0);
+
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+
+  const fetchCounts = async () => {
+    if (!user) return;
+    try {
+      // 1. Fetch unread notifications
+      const notifRes = await notificationService.getUnreadNotifications();
+      if (notifRes && notifRes.status === 'success') {
+        setUnreadNotifications(notifRes.data || []);
+        setUnreadCount(notifRes.count || 0);
+      }
+
+      // 2. Fetch exceptions (only for roles !== Employee)
+      if (user.role !== 'Employee') {
+        const excRes = await apiClient.get('/exceptions');
+        if (excRes.data?.data) {
+          const active = excRes.data.data.filter(ex => ex.status !== 'Closed');
+          setActiveExceptionsCount(active.length);
+        }
+
+        // 3. Fetch ready for payment invoices
+        const invRes = await invoiceService.getInvoices();
+        if (invRes.data) {
+          const ready = invRes.data.filter(inv => inv.currentStatus === 'ReadyForPayment');
+          setReadyForPaymentCount(ready.length);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching live sidebar counts:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchCounts();
+    const interval = setInterval(fetchCounts, 10000); // Poll every 10 seconds
+    return () => clearInterval(interval);
+  }, [user]);
+
+  const handleMarkRead = async (id) => {
+    try {
+      await notificationService.markAsRead(id);
+      setUnreadNotifications(prev => prev.filter(n => n._id !== id));
+      setUnreadCount(prev => Math.max(prev - 1, 0));
+    } catch (err) {
+      console.error('Failed to mark notification as read:', err);
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      await notificationService.markAllAsRead();
+      setUnreadNotifications([]);
+      setUnreadCount(0);
+    } catch (err) {
+      console.error('Failed to mark all notifications as read:', err);
+    }
+  };
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -20,8 +88,10 @@ const MainLayout = ({ children }) => {
       { name: 'Purchase Orders', href: '/purchase-orders', icon: FileSpreadsheet },
       { name: 'Invoices', href: '/invoices', icon: FileSpreadsheet },
       { name: 'Invoice Validation', href: '/validation', icon: RefreshCw },
-      { name: 'Exceptions', href: '/exceptions', icon: AlertTriangle }
+      { name: 'Exceptions', href: '/exceptions', icon: AlertTriangle, badge: activeExceptionsCount > 0 ? activeExceptionsCount : null },
+      { name: 'Payment Workbench', href: '/payment-workbench', icon: CreditCard, badge: readyForPaymentCount > 0 ? readyForPaymentCount : null }
     ] : []),
+    { name: 'Notifications', href: '/notifications', icon: Bell, badge: unreadCount > 0 ? unreadCount : null },
     { name: 'System Settings', href: '#settings', icon: Settings },
   ];
 
@@ -121,17 +191,28 @@ const MainLayout = ({ children }) => {
             >
               <Menu className="h-6 w-6" />
             </button>
-            <div className="hidden sm:block text-sm text-slate-500 font-medium">
-              Enterprise Dashboard &bull; AP Invoice Automation System
+            <div className="hidden md:block ml-4">
+              <SearchBar />
             </div>
           </div>
 
           {/* User profile dropdown and notifications */}
           <div className="flex items-center space-x-4">
-            <button className="relative p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors">
-              <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-brand-500 border-2 border-white rounded-full"></span>
-              <Bell className="h-5 w-5" />
-            </button>
+            <div className="relative">
+              <NotificationBell 
+                unreadCount={unreadCount} 
+                onClick={() => setNotificationOpen(!notificationOpen)} 
+              />
+
+              {notificationOpen && (
+                <NotificationDropdown 
+                  notifications={unreadNotifications}
+                  onClose={() => setNotificationOpen(false)}
+                  onMarkRead={handleMarkRead}
+                  onMarkAllRead={handleMarkAllRead}
+                />
+              )}
+            </div>
 
             {/* Divider */}
             <span className="h-6 w-px bg-slate-200"></span>

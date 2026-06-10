@@ -14,6 +14,9 @@ import auditRoutes from './src/routes/auditRoutes.js';
 import workflowRoutes from './src/routes/workflowRoutes.js';
 import exceptionRoutes from './src/routes/exceptionRoutes.js';
 import dashboardRoutes from './src/routes/dashboardRoutes.js';
+import paymentRoutes from './src/routes/paymentRoutes.js';
+import searchRoutes from './src/routes/searchRoutes.js';
+import notificationRoutes from './src/routes/notificationRoutes.js';
 import errorHandler from './src/middleware/errorHandler.js';
 
 // Load environment variables
@@ -48,6 +51,9 @@ app.use('/api/audit', auditRoutes);
 app.use('/api/workflow', workflowRoutes);
 app.use('/api/exceptions', exceptionRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/search', searchRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Expose uploads directory statically for local storage fallback
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));

@@ -4,18 +4,27 @@ import Vendor from '../models/Vendor.js';
 import InvoiceException from '../models/InvoiceException.js';
 import AuditLog from '../models/AuditLog.js';
 import User from '../models/User.js';
+import PaymentRecord from '../models/PaymentRecord.js';
 
 /**
  * Fetch counts for KPI cards.
  */
 export const getSummaryData = async () => {
-  const [totalVendors, totalPOs, invoiceStatusCounts] = await Promise.all([
+  const [totalVendors, totalPOs, invoiceStatusCounts, paymentStatusCounts] = await Promise.all([
     Vendor.countDocuments(),
     PurchaseOrder.countDocuments(),
     Invoice.aggregate([
       {
         $group: {
           _id: '$currentStatus',
+          count: { $sum: 1 }
+        }
+      }
+    ]),
+    PaymentRecord.aggregate([
+      {
+        $group: {
+          _id: '$paymentStatus',
           count: { $sum: 1 }
         }
       }
@@ -27,13 +36,26 @@ export const getSummaryData = async () => {
     UnderReview: 0,
     Validated: 0,
     ReadyForPayment: 0,
-    Exception: 0
+    Exception: 0,
+    Paid: 0
   };
 
   invoiceStatusCounts.forEach(item => {
     counts.totalInvoices += item.count;
     if (item._id in counts) {
       counts[item._id] = item.count;
+    }
+  });
+
+  const paymentCounts = {
+    Pending: 0,
+    OnHold: 0,
+    Paid: 0
+  };
+
+  paymentStatusCounts.forEach(item => {
+    if (item._id in paymentCounts) {
+      paymentCounts[item._id] = item.count;
     }
   });
 
@@ -44,7 +66,10 @@ export const getSummaryData = async () => {
     invoicesUnderReview: counts.UnderReview,
     validatedInvoices: counts.Validated,
     readyForPayment: counts.ReadyForPayment,
-    exceptionInvoices: counts.Exception
+    exceptionInvoices: counts.Exception,
+    paidInvoices: counts.Paid,
+    pendingPayments: paymentCounts.Pending,
+    paymentsOnHold: paymentCounts.OnHold
   };
 };
 
@@ -61,7 +86,7 @@ export const getInvoiceStatusData = async () => {
     }
   ]);
 
-  const statuses = ['Uploaded', 'Extracted', 'UnderReview', 'Validated', 'ReadyForPayment', 'Exception'];
+  const statuses = ['Uploaded', 'Extracted', 'UnderReview', 'Validated', 'ReadyForPayment', 'Exception', 'Paid'];
   const statusMap = statuses.reduce((acc, status) => {
     acc[status] = 0;
     return acc;

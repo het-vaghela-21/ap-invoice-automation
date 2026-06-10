@@ -549,7 +549,17 @@ const ExceptionsPage = () => {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col">
-                          <span className="font-semibold text-slate-700">{invoiceNum}</span>
+                          {invoiceObj._id ? (
+                            <Link 
+                              to={`/workspace/${invoiceObj._id}`}
+                              className="font-semibold text-brand-650 hover:text-brand-500 transition-colors hover:underline"
+                              id={`exception-invoice-link-${invoiceNum}`}
+                            >
+                              {invoiceNum}
+                            </Link>
+                          ) : (
+                            <span className="font-semibold text-slate-700">{invoiceNum}</span>
+                          )}
                           <span className="text-xs text-slate-400 truncate max-w-[150px]">{vendorName}</span>
                         </div>
                       </td>

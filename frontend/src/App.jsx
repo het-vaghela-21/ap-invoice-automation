@@ -18,6 +18,9 @@ import ValidationQueuePage from './pages/ValidationQueuePage.jsx';
 import VendorsPage from './pages/VendorsPage.jsx';
 import ExceptionsPage from './pages/ExceptionsPage.jsx';
 import ExceptionDetailsPage from './pages/ExceptionDetailsPage.jsx';
+import PaymentWorkbenchPage from './pages/PaymentWorkbenchPage.jsx';
+import WorkspacePage from './pages/WorkspacePage.jsx';
+import NotificationCenter from './pages/NotificationCenter.jsx';
 
 /**
  * Main App Component configuring client-side routing and providers.
@@ -190,6 +193,43 @@ function App() {
                     <ExceptionDetailsPage />
                   </MainLayout>
                 </RoleProtectedRoute>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/payment-workbench"
+            element={
+              <ProtectedRoute>
+                <RoleProtectedRoute allowedRoles={['Admin', 'Manager', 'AccountsExecutive']}>
+                  <MainLayout>
+                    <PaymentWorkbenchPage />
+                  </MainLayout>
+                </RoleProtectedRoute>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/workspace/:invoiceId"
+            element={
+              <ProtectedRoute>
+                <RoleProtectedRoute allowedRoles={['Admin', 'Manager', 'AccountsExecutive']}>
+                  <MainLayout>
+                    <WorkspacePage />
+                  </MainLayout>
+                </RoleProtectedRoute>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/notifications"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <NotificationCenter />
+                </MainLayout>
               </ProtectedRoute>
             }
           />

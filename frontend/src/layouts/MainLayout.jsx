@@ -14,7 +14,7 @@ const MainLayout = ({ children }) => {
   const { user, logout } = useAuth();
 
   const navigation = [
-    { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     ...(user?.role !== 'Employee' ? [
       { name: 'Vendors', href: '/vendors', icon: FileText },
       { name: 'Purchase Orders', href: '/purchase-orders', icon: FileSpreadsheet },

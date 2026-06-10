@@ -13,6 +13,7 @@ import vendorRoutes from './src/routes/vendorRoutes.js';
 import auditRoutes from './src/routes/auditRoutes.js';
 import workflowRoutes from './src/routes/workflowRoutes.js';
 import exceptionRoutes from './src/routes/exceptionRoutes.js';
+import dashboardRoutes from './src/routes/dashboardRoutes.js';
 import errorHandler from './src/middleware/errorHandler.js';
 
 // Load environment variables
@@ -46,6 +47,7 @@ app.use('/api/vendors', vendorRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/workflow', workflowRoutes);
 app.use('/api/exceptions', exceptionRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Expose uploads directory statically for local storage fallback
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));

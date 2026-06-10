@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
@@ -31,14 +31,19 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
 
-          {/* Dashboard & Workspace Routes wrapped in MainLayout & ProtectedRoute */}
+          {/* Root Redirect to Dashboard */}
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+
+          {/* Dashboard Route wrapped in MainLayout, ProtectedRoute, and RoleProtectedRoute */}
           <Route
-            path="/"
+            path="/dashboard"
             element={
               <ProtectedRoute>
-                <MainLayout>
-                  <DashboardPage />
-                </MainLayout>
+                <RoleProtectedRoute allowedRoles={['Admin', 'Manager', 'AccountsExecutive']}>
+                  <MainLayout>
+                    <DashboardPage />
+                  </MainLayout>
+                </RoleProtectedRoute>
               </ProtectedRoute>
             }
           />

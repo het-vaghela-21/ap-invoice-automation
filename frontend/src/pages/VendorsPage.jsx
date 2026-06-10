@@ -56,7 +56,11 @@ const VendorsPage = () => {
 
   useEffect(() => {
     fetchVendors();
-  }, []);
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('create') === 'true' && ['Admin', 'Manager'].includes(user?.role)) {
+      handleOpenCreateModal();
+    }
+  }, [user]);
 
   // Filter local lists
   useEffect(() => {
